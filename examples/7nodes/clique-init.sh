@@ -43,21 +43,34 @@ mkdir -p qdata/logs
 echo "[*] Configuring for $numNodes node(s)"
 echo $numNodes > qdata/numberOfNodes
 
-numPermissionedNodes=`grep "enode" permissioned-nodes.json |wc -l`
+permNodesFile=./permissioned-nodes-${numNodes}.json
+./create-permissioned-nodes.sh $numNodes
+
+numPermissionedNodes=`grep "enode" ${permNodesFile}  |wc -l`
 if [[ $numPermissionedNodes -ne $numNodes ]]; then
     echo "ERROR: $numPermissionedNodes nodes are configured in 'permissioned-nodes.json', but expecting configuration for $numNodes nodes"
+    rm -f $permNodesFile
     exit -1
+fi
+
+genesisFile=./clique-genesis.json
+tempGenesisFile=
+if [[ "$numNodes" -lt 7 ]] ; then
+    # number of nodes is less than 7, update genesis file
+    tempGenesisFile="clique-genesis-${numNodes}.json"
+    ./create-genesis.sh clique $tempGenesisFile $numNodes
+    genesisFile=$tempGenesisFile
 fi
 
 for i in `seq 1 ${numNodes}`
 do
     echo "[*] Configuring node ${i}"
     mkdir -p qdata/dd${i}/{keystore,geth}
-    cp permissioned-nodes.json qdata/dd${i}/static-nodes.json
-    cp permissioned-nodes.json qdata/dd${i}/
+    cp ${permNodesFile} qdata/dd${i}/static-nodes.json
+    cp ${permNodesFile} qdata/dd${i}/permissioned-nodes.json
     cp keys/key${i} qdata/dd${i}/keystore
     cp raft/nodekey${i} qdata/dd${i}/geth/nodekey
-    geth --datadir qdata/dd${i} init clique-genesis.json
+    geth --datadir qdata/dd${i} init $genesisFile
 done
 
 #Initialise Tessera configuration
@@ -65,3 +78,5 @@ done
 
 #Initialise Cakeshop configuration
 ./cakeshop-init.sh
+
+rm -f $tempGenesisFile $permNodesFile

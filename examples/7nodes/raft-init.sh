@@ -43,9 +43,13 @@ mkdir -p qdata/logs
 echo "[*] Configuring for $numNodes node(s)"
 echo $numNodes > qdata/numberOfNodes
 
-numPermissionedNodes=`grep "enode" permissioned-nodes.json |wc -l`
+permNodesFile=./permissioned-nodes-${numNodes}.json
+./create-permissioned-nodes.sh $numNodes
+
+numPermissionedNodes=`grep "enode" ${permNodesFile} |wc -l`
 if [[ $numPermissionedNodes -ne $numNodes ]]; then
     echo "ERROR: $numPermissionedNodes nodes are configured in 'permissioned-nodes.json', but expecting configuration for $numNodes nodes"
+    rm -f $permNodesFile
     exit -1
 fi
 
@@ -54,15 +58,15 @@ do
     mkdir -p qdata/dd${i}/{keystore,geth}
     if [[ $i -le 4 ]]; then
         echo "[*] Configuring node $i (permissioned)"
-        cp permissioned-nodes.json qdata/dd${i}/
+        cp ${permNodesFile} qdata/dd${i}/permissioned-nodes.json
     elif ! [ -z "${STARTPERMISSION+x}" ] ; then
         echo "[*] Configuring node $i (permissioned)"
-        cp permissioned-nodes.json qdata/dd${i}/
+        cp  ${permNodesFile} qdata/dd${i}/permissioned-nodes.json
     else
         echo "[*] Configuring node $i"
     fi
 
-    cp permissioned-nodes.json qdata/dd${i}/static-nodes.json
+    cp ${permNodesFile} qdata/dd${i}/static-nodes.json
     cp keys/key${i} qdata/dd${i}/keystore
     cp raft/nodekey${i} qdata/dd${i}/geth/nodekey
     geth --datadir qdata/dd${i} init genesis.json
@@ -73,3 +77,5 @@ done
 
 #Initialise Cakeshop configuration
 ./cakeshop-init.sh
+
+rm -f $permNodesFile

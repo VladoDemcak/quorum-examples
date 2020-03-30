@@ -56,10 +56,25 @@ if [[ "$istanbulTools" == "true" ]]; then
     cp genesis.json istanbul-genesis.json
 fi
 
-numPermissionedNodes=`grep "enode" permissioned-nodes.json |wc -l`
+permNodesFile=./permissioned-nodes.json
+
+permNodesFile=./permissioned-nodes-${numNodes}.json
+./create-permissioned-nodes.sh $numNodes
+
+numPermissionedNodes=`grep "enode" ${permNodesFile} |wc -l`
 if [[ $numPermissionedNodes -ne $numNodes ]]; then
     echo "ERROR: $numPermissionedNodes nodes are configured in 'permissioned-nodes.json', but expecting configuration for $numNodes nodes"
+    rm -f $permNodesFile
     exit -1
+fi
+
+genesisFile=./istanbul-genesis.json
+tempGenesisFile=
+if [[ "$istanbulTools" == "false" ]] && [[ "$numNodes" -lt 7 ]] ; then
+    # number of nodes is less than 7, update genesis file
+    tempGenesisFile="istanbul-genesis-${numNodes}.json"
+    ./create-genesis.sh istanbul $tempGenesisFile $numNodes
+    genesisFile=$tempGenesisFile
 fi
 
 for i in `seq 1 ${numNodes}`
@@ -72,12 +87,12 @@ do
     else
         cp raft/nodekey${i} qdata/dd${i}/geth/nodekey
     fi
-    cp permissioned-nodes.json qdata/dd${i}/static-nodes.json
+    cp ${permNodesFile} qdata/dd${i}/static-nodes.json
     if ! [[ -z "${STARTPERMISSION+x}" ]] ; then
-        cp permissioned-nodes.json qdata/dd${i}/permissioned-nodes.json
+        cp ${permNodesFile} qdata/dd${i}/permissioned-nodes.json
     fi
     cp keys/key${i} qdata/dd${i}/keystore
-    geth --datadir qdata/dd${i} init istanbul-genesis.json
+    geth --datadir qdata/dd${i} init $genesisFile
 done
 
 #Initialise Tessera configuration
@@ -85,3 +100,4 @@ done
 
 #Initialise Cakeshop configuration
 ./cakeshop-init.sh
+rm -f $tempGenesisFile $permNodesFile
